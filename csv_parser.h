@@ -18,10 +18,8 @@ typedef struct csv_record
 	struct csv_record* next;
 } csv_record;
 
-#define CSV_CELL_LENGTH 32
-
 csv_record* csv_init(uint32_t total_rows, uint32_t total_columns);
-void csv_parse(char* fn, csv_record* d);
+bool csv_parse(char* fn, csv_record* d);
 csv_record* partition(csv_record* cs, csv_record* h, csv_record* e, csv_record** nh, csv_record** ne);
 csv_record* quick_sort_recursion(csv_record* cs, csv_record* h, csv_record* e);
 void quick_sort(csv_record* cs, csv_record** hr);
@@ -35,7 +33,7 @@ void csv_free(csv_record* d);
 uint32_t csv_find_record_id(csv_record* cs, uint32_t cid, char* r);
 char** csv_get_row(csv_record* cs, uint32_t rid);
 
-int32_t curr_record = 0, curr_column = 0;
-uint32_t total_rows = 0, total_columns = 0, sort_column = 0;
+static int32_t curr_record, curr_column;
+static uint32_t total_rows, total_columns, sort_column;
 
 #endif

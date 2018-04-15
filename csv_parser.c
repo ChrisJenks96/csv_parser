@@ -1,36 +1,9 @@
 #include "csv_parser.h"
 
-
-int main(int argc, char** argv)
+csv_record* csv_init(uint32_t tr, uint32_t tc)
 {
-	if (argc > 3)
-	{
-		total_columns = atoi(argv[2]);
-		total_rows = atoi(argv[3]);
-		csv_record* data = csv_init(total_rows, total_columns);
-		csv_parse("data.csv", data);
-		csv_print_records("original", data);
-
-		if (argc > 4)
-		{
-			sort_column = atoi(argv[4]);
-			quick_sort(data, &data);
-			//print_records("sorted data", data);
-			csv_write_records("sorted_csv_data.csv", data);
-		}
-
-		csv_free(data);
-		printf("finished csv parsing\n");
-	}
-
-	else
-		printf("[csv name] [num columns] [num rows] [sort column]\n");
-
-	return 0;
-}
-
-csv_record* csv_init(uint32_t total_rows, uint32_t total_columns)
-{
+	total_rows = tr;
+	total_columns = tc;
 	csv_record* data = (csv_record*)malloc(sizeof(csv_record) * total_rows);
 	//alloc the new columns, link our next column
 	uint32_t i;
@@ -75,10 +48,23 @@ void csv_write_column_header(char* fn, csv_record* cs, uint32_t cid)
 {
 	//x,y,z\n
 	FILE* f = fopen(fn, "w");
-	uint32_t c = 0;
+	uint32_t c = 0, nc = 0;
 	fprintf(f, "#pragma once\n\n");
-	while (cs != NULL){
-		fprintf(f, "#define %s %i", cs->columns[cid], c++);
+	while (cs != NULL)
+	{
+		//replace anything less than 47 in the ascii table w/ underscore
+		while (nc < strlen(cs->columns[cid])){
+			if (cs->columns[cid][nc] < 47)
+				cs->columns[cid][nc] = '_';
+			nc++;
+		}
+
+		nc = 0;
+		//if the first char is a number, we need to append a '_' to the beg
+		if (cs->columns[cid][0] < 64)
+			fprintf(f, "#define _%s %i", cs->columns[cid], c++);
+		else 
+			fprintf(f, "#define %s %i", cs->columns[cid], c++);
 		fprintf(f, "\n");
 		cs = cs->next;
 	}
@@ -115,53 +101,59 @@ uint32_t csv_find_record_id(csv_record* cs, uint32_t cid, char* r)
 	}
 }
 
-void csv_parse(char* fn, csv_record* d)
+bool csv_parse(char* fn, csv_record* d)
 {
 	FILE* f = fopen(fn, "rb");
-	fseek(f, 0, SEEK_END);
-	uint32_t buf_len = ftell(f);
-	fseek(f, 0, SEEK_SET);
-	char* b = (char*)malloc(sizeof(char) * buf_len);
-	bool str_value = false;
-	uint32_t buf_c = 0;
-	int32_t key_c = 0, old_key_c = 0;
-	while (buf_c < buf_len)
+	if (f == NULL)
+		return false;
+	else
 	{
-		fread(&b[buf_c], 1, 1, f);
-		//if our value has a comma in that isn't used to seperate fields
-		//then treat this as a formatted value e.g. "13,000"
-		if (b[buf_c] != 0x22)
+		fseek(f, 0, SEEK_END);
+		uint32_t buf_len = ftell(f);
+		fseek(f, 0, SEEK_SET);
+		char* b = (char*)malloc(sizeof(char) * buf_len);
+		fread(&b[0], buf_len, 1, f);
+		fclose(f);
+		bool str_value = false;
+		uint32_t buf_c = 0;
+		int32_t key_c = 0, old_key_c = 0;
+		while (buf_c < buf_len)
 		{
-			//0x0D CR, 0x2C COMMA
-			if (b[buf_c] == 0x2C || b[buf_c] == 0x0D)
+			//if our value has a comma in that isn't used to seperate fields
+			//then treat this as a formatted value e.g. "13,000"
+			if (b[buf_c] != 0x22)
 			{
-				if (!str_value)
+				//0x0D CR, 0x2C COMMA
+				if (b[buf_c] == 0x2C || b[buf_c] == 0x0D)
 				{
-					if (curr_column >= total_columns){
-						curr_record++;
-						curr_column = 0;
-						//increment to skip str formatting on new row
-						old_key_c++;
-					}
+					if (!str_value)
+					{
+						if (curr_column >= total_columns){
+							curr_record++;
+							curr_column = 0;
+							//increment to skip str formatting on new row
+							old_key_c++;
+						}
 
-					//alloc the select column, format, null terminate and place data in it
-					d[curr_record].columns[curr_column] = (char*)malloc((key_c - old_key_c) + 1);
-					memcpy(&d[curr_record].columns[curr_column][0], &b[old_key_c], key_c - old_key_c);
-					d[curr_record].columns[curr_column][key_c - old_key_c] = 0;
-					old_key_c = key_c + 1; 
-					curr_column++;
+						//alloc the select column, format, null terminate and place data in it
+						d[curr_record].columns[curr_column] = (char*)malloc((key_c - old_key_c) + 1);
+						memcpy(&d[curr_record].columns[curr_column][0], &b[old_key_c], key_c - old_key_c);
+						d[curr_record].columns[curr_column][key_c - old_key_c] = 0;
+						old_key_c = key_c + 1; 
+						curr_column++;
+					}
 				}
 			}
+
+			else
+				str_value = !str_value;
+
+			buf_c++; key_c++;
 		}
 
-		else
-			str_value = !str_value;
-
-		buf_c++; key_c++;
+		free(b);
+		return true;
 	}
-
-	free(b);
-	fclose(f);
 }
 
 void csv_free(csv_record* d)
