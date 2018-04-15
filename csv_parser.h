@@ -20,15 +20,20 @@ typedef struct csv_record
 
 #define CSV_CELL_LENGTH 32
 
-void csv_parse(csv_record* d, char* b, uint32_t l);
+csv_record* csv_init(uint32_t total_rows, uint32_t total_columns);
+void csv_parse(char* fn, csv_record* d);
 csv_record* partition(csv_record* cs, csv_record* h, csv_record* e, csv_record** nh, csv_record** ne);
 csv_record* quick_sort_recursion(csv_record* cs, csv_record* h, csv_record* e);
 void quick_sort(csv_record* cs, csv_record** hr);
-void print_records(char* txt, csv_record* cs);
+void csv_print_records(char* txt, csv_record* cs);
 uint32_t char_get_value(char* v);
 csv_record* csv_get_element(csv_record* cs, uint32_t rid);
 csv_record* csv_find_tail(csv_record* cs);
-void write_records(char* fn, csv_record* cs);
+void csv_write_records(char* fn, csv_record* cs);
+void csv_write_column_header(char* fn, csv_record* cs, uint32_t cid);
+void csv_free(csv_record* d);
+uint32_t csv_find_record_id(csv_record* cs, uint32_t cid, char* r);
+char** csv_get_row(csv_record* cs, uint32_t rid);
 
 int32_t curr_record = 0, curr_column = 0;
 uint32_t total_rows = 0, total_columns = 0, sort_column = 0;

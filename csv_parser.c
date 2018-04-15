@@ -1,58 +1,26 @@
 #include "csv_parser.h"
 
+
 int main(int argc, char** argv)
 {
 	if (argc > 3)
 	{
-		FILE* f = fopen(argv[1], "rb");
 		total_columns = atoi(argv[2]);
 		total_rows = atoi(argv[3]);
+		csv_record* data = csv_init(total_rows, total_columns);
+		csv_parse("data.csv", data);
+		csv_print_records("original", data);
 
-		if (f != NULL)
+		if (argc > 4)
 		{
-			uint32_t i;
-			printf("opened %s successfully\n", argv[1]);
-			csv_record* data = (csv_record*)malloc(sizeof(csv_record) * total_rows);
-			//alloc the new columns, link our next column
-			for (i = 0; i < total_rows; i++){
-				data[i].columns = (char**)malloc(sizeof(char**) * total_columns);
-				data[i].next = &data[i+1];
-			}
-
-			//ensure our last record doesn't link to any other
-			data[total_rows-1].next = NULL;
-
-			fseek(f, 0, SEEK_END);
-			uint32_t fs = ftell(f);
-			fseek(f, 0, SEEK_SET);
-			char* buffer = (char*)malloc(sizeof(char) * fs);
-			fread(&buffer[0], fs, 1, f);
-			csv_parse(data, buffer, fs);
-			print_records("original", data);
-			fclose(f);
-			free(buffer);
-			buffer = NULL;
-
-			if (argc > 4)
-			{
-				sort_column = atoi(argv[4]);
-				quick_sort(data, &data);
-				//print_records("sorted data", data);
-				write_records("sorted_csv_data.csv", data);
-			}
-
-			while (data != NULL)
-			{
-				free(data->columns);
-				data->columns = NULL;
-				data = data->next;
-			}
-		
-			printf("finished csv parsing\n");
+			sort_column = atoi(argv[4]);
+			quick_sort(data, &data);
+			//print_records("sorted data", data);
+			csv_write_records("sorted_csv_data.csv", data);
 		}
 
-		else
-			printf("failed to open %s\n", argv[1]);
+		csv_free(data);
+		printf("finished csv parsing\n");
 	}
 
 	else
@@ -61,8 +29,28 @@ int main(int argc, char** argv)
 	return 0;
 }
 
+csv_record* csv_init(uint32_t total_rows, uint32_t total_columns)
+{
+	csv_record* data = (csv_record*)malloc(sizeof(csv_record) * total_rows);
+	//alloc the new columns, link our next column
+	uint32_t i;
+	for (i = 0; i < total_rows; i++){
+		data[i].columns = (char**)malloc(sizeof(char**) * total_columns);
+		data[i].next = &data[i+1];
+	}
+
+	//ensure our last record doesn't link to any other
+	data[total_rows-1].next = NULL;
+	return data;
+}
+
+char** csv_get_row(csv_record* cs, uint32_t rid)
+{
+	return cs[rid].columns;
+}
+
 //traverse the list writing records to file
-void write_records(char* fn, csv_record* cs)
+void csv_write_records(char* fn, csv_record* cs)
 {
 	//x,y,z\n
 	FILE* f = fopen(fn, "w");
@@ -80,11 +68,27 @@ void write_records(char* fn, csv_record* cs)
 	}
 
 	fclose(f);
-	printf("written sorted data to %s\n", fn);
+	printf("written data to %s\n", fn);
+}
+
+void csv_write_column_header(char* fn, csv_record* cs, uint32_t cid)
+{
+	//x,y,z\n
+	FILE* f = fopen(fn, "w");
+	uint32_t c = 0;
+	fprintf(f, "#pragma once\n\n");
+	while (cs != NULL){
+		fprintf(f, "#define %s %i", cs->columns[cid], c++);
+		fprintf(f, "\n");
+		cs = cs->next;
+	}
+
+	fclose(f);
+	printf("written data to %s\n", fn);
 }
 
 //traverse the list writing records to commandline
-void print_records(char* txt, csv_record* cs)
+void csv_print_records(char* txt, csv_record* cs)
 {
 	uint32_t i = 0, c = i;
 	csv_record* current = &cs[0];
@@ -97,15 +101,33 @@ void print_records(char* txt, csv_record* cs)
 	}
 }
 
-void csv_parse(csv_record* d, char* b, uint32_t l)
+//find record based on column id
+uint32_t csv_find_record_id(csv_record* cs, uint32_t cid, char* r)
 {
-	//32 bytes char length by default
-	char csv_key[CSV_CELL_LENGTH];
+	uint32_t c = 0;
+	csv_record* current = &cs[0];
+	while (current != NULL){
+		if (strcmp(current->columns[cid], r) == 0)
+			return c;
+
+		current = current->next;
+		c++;
+	}
+}
+
+void csv_parse(char* fn, csv_record* d)
+{
+	FILE* f = fopen(fn, "rb");
+	fseek(f, 0, SEEK_END);
+	uint32_t buf_len = ftell(f);
+	fseek(f, 0, SEEK_SET);
+	char* b = (char*)malloc(sizeof(char) * buf_len);
 	bool str_value = false;
 	uint32_t buf_c = 0;
 	int32_t key_c = 0, old_key_c = 0;
-	while (buf_c < l)
+	while (buf_c < buf_len)
 	{
+		fread(&b[buf_c], 1, 1, f);
 		//if our value has a comma in that isn't used to seperate fields
 		//then treat this as a formatted value e.g. "13,000"
 		if (b[buf_c] != 0x22)
@@ -136,6 +158,18 @@ void csv_parse(csv_record* d, char* b, uint32_t l)
 			str_value = !str_value;
 
 		buf_c++; key_c++;
+	}
+
+	free(b);
+	fclose(f);
+}
+
+void csv_free(csv_record* d)
+{
+	while (d != NULL){
+		free(d->columns);
+		d->columns = NULL;
+		d = d->next;
 	}
 }
 
