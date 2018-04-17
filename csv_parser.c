@@ -44,7 +44,9 @@ void csv_write_records(char* fn, csv_record* cs)
 	printf("written data to %s\n", fn);
 }
 
-void csv_write_column_header(char* fn, csv_record* cs, uint32_t cid)
+//write the csv records using a column id w/ the option for using an id built into 
+//the csv database, if you don't wish to use an inbuilt id, caid = -1
+void csv_write_column_header(char* fn, csv_record* cs, uint32_t cid, int32_t caid)
 {
 	//x,y,z\n
 	FILE* f = fopen(fn, "w");
@@ -53,7 +55,8 @@ void csv_write_column_header(char* fn, csv_record* cs, uint32_t cid)
 	while (cs != NULL)
 	{
 		//replace anything less than 47 in the ascii table w/ underscore
-		while (nc < strlen(cs->columns[cid])){
+		uint32_t dat_len = strlen(cs->columns[cid]);
+		while (nc < dat_len){
 			if (cs->columns[cid][nc] < 47)
 				cs->columns[cid][nc] = '_';
 			nc++;
@@ -62,9 +65,21 @@ void csv_write_column_header(char* fn, csv_record* cs, uint32_t cid)
 		nc = 0;
 		//if the first char is a number, we need to append a '_' to the beg
 		if (cs->columns[cid][0] < 64)
-			fprintf(f, "#define _%s %i", cs->columns[cid], c++);
+		{
+			if (caid == -1)
+				fprintf(f, "#define _%s %i", cs->columns[cid], c++);
+			else
+				fprintf(f, "#define _%s %i", cs->columns[cid], atoi(cs->columns[caid]));
+		}
+
 		else 
-			fprintf(f, "#define %s %i", cs->columns[cid], c++);
+		{
+			if (caid == -1)
+				fprintf(f, "#define %s %i", cs->columns[cid], c++);
+			else
+				fprintf(f, "#define %s %i", cs->columns[cid], atoi(cs->columns[caid]));
+		}
+
 		fprintf(f, "\n");
 		cs = cs->next;
 	}
@@ -87,11 +102,11 @@ void csv_print_records(char* txt, csv_record* cs)
 	}
 }
 
-//find record based on column id
-uint32_t csv_find_record_id(csv_record* cs, uint32_t cid, char* r)
+//find record based on column id and string
+uint32_t csv_find_record_id(csv_record* cs, uint32_t rid, uint32_t cid, char* r)
 {
-	uint32_t c = 0;
-	csv_record* current = &cs[0];
+	uint32_t c = rid;
+	csv_record* current = &cs[rid];
 	while (current != NULL){
 		if (strcmp(current->columns[cid], r) == 0)
 			return c;
@@ -99,6 +114,23 @@ uint32_t csv_find_record_id(csv_record* cs, uint32_t cid, char* r)
 		current = current->next;
 		c++;
 	}
+
+	return -1;
+}
+
+//return the column matched with the string id
+uint32_t csv_get_record_column(csv_record* cs, uint32_t cid, char* r)
+{
+	uint32_t c = 0;
+	csv_record* current = &cs[0];
+	while (current != NULL){
+		if (strcmp(current->columns[cid], r) == 0)
+			return c;
+		current = current->next;
+		c++;
+	}
+
+	return NULL;
 }
 
 bool csv_parse(char* fn, csv_record* d)
@@ -151,6 +183,9 @@ bool csv_parse(char* fn, csv_record* d)
 			buf_c++; key_c++;
 		}
 
+		//reset
+		curr_column = 0;
+		curr_record = 0;
 		free(b);
 		return true;
 	}

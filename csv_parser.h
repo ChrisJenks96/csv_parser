@@ -28,9 +28,10 @@ uint32_t char_get_value(char* v);
 csv_record* csv_get_element(csv_record* cs, uint32_t rid);
 csv_record* csv_find_tail(csv_record* cs);
 void csv_write_records(char* fn, csv_record* cs);
-void csv_write_column_header(char* fn, csv_record* cs, uint32_t cid);
+void csv_write_column_header(char* fn, csv_record* cs, uint32_t cid, int32_t caid);
 void csv_free(csv_record* d);
-uint32_t csv_find_record_id(csv_record* cs, uint32_t cid, char* r);
+uint32_t csv_find_record_id(csv_record* cs, uint32_t rid, uint32_t cid, char* r);
+uint32_t csv_get_record_column(csv_record* cs, uint32_t cid, char* r);
 char** csv_get_row(csv_record* cs, uint32_t rid);
 
 static int32_t curr_record, curr_column;
